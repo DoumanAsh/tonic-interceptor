@@ -1,0 +1,25 @@
+name: Rust
+
+on:
+  push:
+    paths-ignore:
+      - 'README.md'
+      - 'LICENSE'
+      - '.gitignore'
+    branches:
+      - 'master'
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - 'README.md'
+      - 'LICENSE'
+      - '.gitignore'
+
+jobs:
+  check:
+    if: github.event.pull_request.draft == false
+    uses: DoumanAsh/douman-ci/.github/workflows/rust.yml@master
+    with:
+      cargo-no-features: false
+      valgrind: false
+      miri: false

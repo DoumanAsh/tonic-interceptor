@@ -1,0 +1,27 @@
+[package]
+name = "tonic-interceptor"
+version = "0.1.0"
+authors = ["Douman <douman@gmx.se>"]
+edition = "2018"
+description = "Improve tonic interceptor"
+license = "BSL-1.0"
+repository = "https://github.com/DoumanAsh/tonic-interceptor"
+readme = "README.md"
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "README.md"
+]
+
+[dependencies]
+bytes = "1"
+tower-layer = "0.3"
+tower-service = "0.3"
+
+[dependencies.http]
+version = "0.2"
+default-features = false
+
+[dependencies.tonic]
+version = "0.11"
+default-features = false

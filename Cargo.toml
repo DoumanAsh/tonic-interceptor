@@ -7,6 +7,8 @@ description = "Improve tonic interceptor"
 license = "BSL-1.0"
 repository = "https://github.com/DoumanAsh/tonic-interceptor"
 readme = "README.md"
+keywords = ["async", "grpc", "tonic", "protobuf", "interceptor"]
+categories = ["web-programming"]
 include = [
     "**/*.rs",
     "Cargo.toml",

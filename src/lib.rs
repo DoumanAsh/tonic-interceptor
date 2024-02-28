@@ -1,4 +1,4 @@
-//! Improve tonic interceptor
+//! Improved tonic interceptor
 #![warn(missing_docs)]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
 

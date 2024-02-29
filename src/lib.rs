@@ -6,6 +6,8 @@ use core::task;
 use core::pin::Pin;
 use core::future::Future;
 
+const GRPC_STATUS_HEADER_CODE: &str = "grpc-status";
+
 ///Tonic interceptor
 pub trait Interceptor {
     ///Callback on incoming request, allowing you to modify headers or extensions
@@ -15,12 +17,8 @@ pub trait Interceptor {
     ///Returning status will preempt request handling and immediately returns status
     fn on_request(&self, headers: &mut tonic::metadata::MetadataMap, extensions: &mut http::Extensions) -> Option<tonic::Status>;
 
-    #[inline(always)]
     ///Callback when response is being returned
-    ///
-    ///By default does nothing
-    fn on_response(&self, _headers: &mut tonic::metadata::MetadataMap, _extensions: &http::Extensions) {
-    }
+    fn on_response(&self, status: tonic::Code, _headers: &mut http::HeaderMap, _extensions: &http::Extensions);
 }
 
 impl<I: Interceptor> Interceptor for std::sync::Arc<I> {
@@ -30,8 +28,8 @@ impl<I: Interceptor> Interceptor for std::sync::Arc<I> {
     }
 
     #[inline(always)]
-    fn on_response(&self, headers: &mut tonic::metadata::MetadataMap, extensions: &http::Extensions) {
-        Interceptor::on_response(self.as_ref(), headers, extensions)
+    fn on_response(&self, status: tonic::Code, headers: &mut http::HeaderMap, extensions: &http::Extensions) {
+        Interceptor::on_response(self.as_ref(), status, headers, extensions)
     }
 }
 
@@ -137,25 +135,15 @@ impl<ResBody: Default, E, I: Interceptor, F: Future<Output = Result<http::Respon
         match Future::poll(fut, ctx) {
             task::Poll::Ready(Result::Ok(resp)) => {
                 let (mut parts, body) = resp.into_parts();
-                let mut headers = tonic::metadata::MetadataMap::from_headers(parts.headers);
-                intercepter.on_response(&mut headers, &parts.extensions);
-                parts.headers = headers.into_headers();
+
+                let status = parts.headers.get(GRPC_STATUS_HEADER_CODE).map(|header| tonic::Code::from_bytes(header.as_bytes())).unwrap_or(tonic::Code::Unknown);
+
+                intercepter.on_response(status, &mut parts.headers, &parts.extensions);
                 task::Poll::Ready(Ok(http::Response::from_parts(parts, body)))
             },
             task::Poll::Ready(Result::Err(error)) => task::Poll::Ready(Err(error)),
             task::Poll::Pending => task::Poll::Pending,
         }
-    }
-}
-
-#[derive(Clone)]
-///Interceptor for on request only
-pub struct OnRequest<F>(pub F);
-
-impl<F: Fn(&mut tonic::metadata::MetadataMap, &mut http::Extensions) -> Option<tonic::Status>> Interceptor for OnRequest<F> {
-    #[inline(always)]
-    fn on_request(&self, headers: &mut tonic::metadata::MetadataMap, extensions: &mut http::Extensions) -> Option<tonic::Status> {
-        (self.0)(headers, extensions)
     }
 }
 
@@ -168,7 +156,7 @@ pub struct InterceptorFn<OnReq, OnResp> {
     pub on_response: OnResp,
 }
 
-impl<OnReq: Fn(&mut tonic::metadata::MetadataMap, &mut http::Extensions) -> Option<tonic::Status>, OnResp: Fn(&mut tonic::metadata::MetadataMap, &http::Extensions)> Interceptor for InterceptorFn<OnReq, OnResp> {
+impl<OnReq: Fn(&mut tonic::metadata::MetadataMap, &mut http::Extensions) -> Option<tonic::Status>, OnResp: Fn(tonic::Code, &mut http::HeaderMap, &http::Extensions)> Interceptor for InterceptorFn<OnReq, OnResp> {
 
     #[inline(always)]
     fn on_request(&self, headers: &mut tonic::metadata::MetadataMap, extensions: &mut http::Extensions) -> Option<tonic::Status> {
@@ -176,8 +164,8 @@ impl<OnReq: Fn(&mut tonic::metadata::MetadataMap, &mut http::Extensions) -> Opti
     }
 
     #[inline(always)]
-    fn on_response(&self, headers: &mut tonic::metadata::MetadataMap, extensions: &http::Extensions) {
-        (self.on_response)(headers, extensions)
+    fn on_response(&self, status: tonic::Code, headers: &mut http::HeaderMap, extensions: &http::Extensions) {
+        (self.on_response)(status, headers, extensions)
     }
 }
 

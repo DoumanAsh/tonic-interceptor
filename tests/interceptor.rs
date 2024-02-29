@@ -1,4 +1,4 @@
-use tonic_interceptor::{OnRequest, InterceptorService};
+use tonic_interceptor::{InterceptorFn, InterceptorService};
 
 use tonic::Status;
 use tonic::metadata::{MetadataValue, MetadataMap};
@@ -55,9 +55,13 @@ fn should_propagate_status_on_request() {
         Ok::<_, Status>(http::Response::new(()))
     });
 
-    let interceptor = OnRequest(|_: &mut tonic::metadata::MetadataMap, _: &mut http::Extensions| {
-        Some(Status::permission_denied(MSG))
-    });
+    let interceptor = InterceptorFn {
+        on_request: |_: &mut tonic::metadata::MetadataMap, _: &mut http::Extensions| {
+            Some(Status::permission_denied(MSG))
+        },
+        on_response: |_: tonic::Code, _: &mut http::HeaderMap, _: &http::Extensions| {
+        }
+    };
 
     let mut service = InterceptorService::new(interceptor, svc);
     let request = http::Request::builder().body(()).unwrap();
@@ -102,12 +106,16 @@ fn should_modify_request_parts() {
         Ok::<_, Status>(http::Response::new(()))
     });
 
-    let interceptor = OnRequest(|headers: &mut MetadataMap, extensions: &mut http::Extensions| {
-        headers.insert_bin("x-msg-bin", MetadataValue::from_bytes(BIN.as_bytes()));
-        headers.insert("x-msg", MSG.parse().unwrap());
-        extensions.insert(Dummy(EXT));
-        None
-    });
+    let interceptor = InterceptorFn {
+        on_request: |headers: &mut tonic::metadata::MetadataMap, extensions: &mut http::Extensions| {
+            headers.insert_bin("x-msg-bin", MetadataValue::from_bytes(BIN.as_bytes()));
+            headers.insert("x-msg", MSG.parse().unwrap());
+            extensions.insert(Dummy(EXT));
+            None
+        },
+        on_response: |_: tonic::Code, _: &mut http::HeaderMap, _: &http::Extensions| {
+        }
+    };
 
     let mut service = InterceptorService::new(interceptor, svc);
     let request = http::Request::builder().body(()).unwrap();

@@ -49,7 +49,7 @@ impl<Request, R, E, T: FnMut(Request) -> Result<R, E>> Service<Request> for Serv
 #[test]
 fn should_propagate_status_on_request() {
     const MSG: &str = "BAD";
-    let expected = Status::permission_denied(MSG).to_http();
+    let expected = Status::permission_denied(MSG).into_http();
 
     let svc = ServiceFn(|_: http::Request<()>| {
         Ok::<_, Status>(http::Response::new(()))
@@ -82,6 +82,7 @@ fn should_propagate_status_on_request() {
 
 #[test]
 fn should_modify_request_parts() {
+    #[derive(Clone)]
     struct Dummy(&'static str);
 
     const MSG: &str = "BAD";
